@@ -5,12 +5,28 @@ from discord.ext import commands
 import asyncio
 import time
 from itertools import cycle
+import youtube_dl
+import json
+import os
 
 Client = discord.Client()
 client = commands.Bot(command_prefix = "bob.")
 client.remove_command('help')
+os.chdir(r'/home/lavie/code/creepyindianguy.py') #NEED THE CORRECT PATH
 
+#For bot's status 
 status = [' bitch lasagna', ' bob.help for help', ' Roblox']
+
+#For audio
+players = {}
+queues = {}
+
+#Actually playing the song that's next on queue
+def check_queue(id):
+    if queues[id] != []:
+        player = queues[id].pop(0)
+        players[id] = player
+        player.start()
 
 #Status cycle
 async def change_status():
@@ -52,6 +68,47 @@ async def on_reaction_remove(reaction, user):
     channel = reaction.message.channel
     await client.send_message(channel, '{} has removed {} from the message: {}'.format(user.name, reaction.emoji, reaction.message.content))
 
+'''Level system'''
+@client.event
+async def on_member_join(member):
+    with open('users.json', 'r') as f:
+        users = json.load(f)
+    
+    await update_data(users, member)
+
+    with open('users.json', 'w') as f:
+        json.dump(users, f)
+
+@client.event
+async def on_message(message):
+    with open('users.json', 'r') as f:
+        users = json.load(f)
+    
+    await update_data(users, message.author)
+    await add_experience(users, message.author, 5)
+    await level_up(users, message.author, message.channel)
+
+    with open('users.json', 'w') as f:
+        json.dump(users, f)
+
+async def update_data(users, user):
+    if not user.id in users:
+        users[user.id] = {}
+        users[user.id]['experience'] = 0
+        users[user.id]['level'] = 1
+
+async def add_experience(users, user, exp):
+    users[user.id]['experience'] += exp
+
+async def level_up(users, user, channel):
+    experience = users[user.id]['experience']
+    lvl_start = users[user.id]['level']
+    lvl_end = int(experience ** (1/3))
+
+    if lvl_start < lvl_end:
+        await client.send_message(channel, "{} has leveled up to level {} mafia (#that's how the mafia works)".format(user.mention, lvl_end))
+        users[user.id]['level'] = lvl_end
+
 #We don't really need this on-delete functionality if we have logger, unless we can replace it. Still useful in general.
 #@client.event
 # sync def on_message_delete(message):
@@ -77,7 +134,8 @@ async def help():
     embed.set_author(name='Creepy Indian Guy Commands')
     
     embed.add_field(name='Logout Bot', value='indianguy.logout', inline=False)
-    embed.add_field(name='Functionality', value='bob.clear', inline=False)
+    embed.add_field(name='Functionality', value='bob.clear, bob.play, bob.join, bob.leave', inline=False)
+    embed.add_field(name='Voice Channels', value='bob.play, bob.join, bob.leave', inline=False)
     embed.add_field(name='Other', value='bob.ping, bob.echo', inline=False)
 
     await client.say(embed = embed)
@@ -118,6 +176,47 @@ async def leave(ctx):
     server = ctx.message.server
     voice_client = client.voice_client_in(server)
     await voice_client.disconnect()
+    
+#Playing YouTube videos
+@client.command(pass_context=True)
+async def play (ctx, url):
+    server = ctx.message.server
+    voice_client = client.voice_client_in(server)
+    player = await voice_client.create_ytdl_player(url, after=lambda: check_queue(server.id))
+    players[server.id] = player
+    player.start()
+
+#Pause audio
+@client.command(pass_context=True)
+async def pause(ctx):
+    id = ctx.message.server.id
+    players[id].pause()
+
+#Resume audio
+@client.command(pass_context=True)
+async def resume(ctx):
+    id = ctx.message.server.id
+    players[id].resume()
+
+#Stop audio
+@client.command(pass_context=True)
+async def stop(ctx):
+    id = ctx.message.server.id
+    players[id].stop()
+
+#Song queueing
+@client.command(pass_context=True)
+async def queue(ctx, url):
+    server = ctx.message.server
+    voice_client = client.voice_client_in(server)
+    player = await voice_client.create_ytdl_player(url, after=lambda: check_queue(server.id))
+
+    if server.id in queues:
+        queues[server.id].append(player)
+    else:
+        queues[server.id] = [player]
+    await client.say('Video queued. I hope you send bobs.')
+
 
 #For the status cycler
 client.loop.create_task(change_status())
