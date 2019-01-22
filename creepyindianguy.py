@@ -14,6 +14,11 @@ client = commands.Bot(command_prefix = "bob.")
 client.remove_command('help')
 os.chdir(r'/home/lavie/code/creepyindianguy.py') #NEED THE CORRECT PATH
 
+channelname = '519348806467321858'
+
+#Connected guilds
+mhs_guild = client.get_server(519348806467321856)
+
 #For bot's status 
 status = [' bitch lasagna', ' bob.help for help', ' Roblox']
 
@@ -44,6 +49,11 @@ async def on_ready():
     #await client.change_presence(game=discord.Game(name=" bitch lasagna")) #make bitch lasagna the help command
     print("Bot is ready for kiss bob!")
 
+    print('Logged in as')
+    print(client.user.name)
+    print(client.user.id)
+    print('------')
+
 #Log messages internally (in console)
 @client.event
 async def on_message(message):
@@ -53,6 +63,17 @@ async def on_message(message):
     if message.content.lower() == "indianguy.logout":
         await client.close()
 
+    with open('users.json', 'r') as f:
+        users = json.load(f)
+    
+    await update_data(users, message.author)
+    await add_experience(users, message.author, 5)
+    await level_up(users, message.author, message.channel)
+
+    with open('users.json', 'w') as f:
+        json.dump(users, f)
+
+    await client.process_commands(message)
 
 #We need a way to allow and disallow reactions by the user (perhaps a command that switches it on and off)
 
@@ -71,22 +92,14 @@ async def on_reaction_remove(reaction, user):
 '''Level system'''
 @client.event
 async def on_member_join(member):
+    server = member.server
+    fmt = 'Welcome {0.mention} to {1.name}!'
+    await client.send_message(channelname, fmt.format(member, server.get_channel))
+
     with open('users.json', 'r') as f:
         users = json.load(f)
     
     await update_data(users, member)
-
-    with open('users.json', 'w') as f:
-        json.dump(users, f)
-
-@client.event
-async def on_message(message):
-    with open('users.json', 'r') as f:
-        users = json.load(f)
-    
-    await update_data(users, message.author)
-    await add_experience(users, message.author, 5)
-    await level_up(users, message.author, message.channel)
 
     with open('users.json', 'w') as f:
         json.dump(users, f)
@@ -103,22 +116,22 @@ async def add_experience(users, user, exp):
 async def level_up(users, user, channel):
     experience = users[user.id]['experience']
     lvl_start = users[user.id]['level']
-    lvl_end = int(experience ** (1/3))
+    lvl_end = int(experience ** (1/6))
 
     if lvl_start < lvl_end:
         await client.send_message(channel, "{} has leveled up to level {} mafia (#that's how the mafia works)".format(user.mention, lvl_end))
         users[user.id]['level'] = lvl_end
 
 #We don't really need this on-delete functionality if we have logger, unless we can replace it. Still useful in general.
-#@client.event
-# sync def on_message_delete(message):
-    #await client.send_message(message.channel, f"{message.channel}: {message.author}: {message.author.name}: {message.content}")
-    #await client.process_commands(message)
+@client.event
+async def on_message_delete(message):
+    await client.send_message(message.channel, f"{message.channel}: {message.author}: {message.author.name}: {message.content}")
+    await client.process_commands(message)
 
 #MISSING PERMISSIONS ERROR @client.event
-#async def on_member_join(member):
-    #role = discord.utils.get(member.server.roles, name='W1GG3R5')
-    #await client.add_roles(member, role)
+async def on_member_join(member):
+    role = discord.utils.get(member.server.roles, name='W1GG3R5')
+    await client.add_roles(member, role)
 
 #Help command
 @client.command(pass_contenxt=True)
@@ -216,6 +229,11 @@ async def queue(ctx, url):
     else:
         queues[server.id] = [player]
     await client.say('Video queued. I hope you send bobs.')
+
+#Member count
+@client.command(pass_context=True)
+async def member_count():
+        await client.say(f"{mhs_guild.member_count}")
 
 
 #For the status cycler
