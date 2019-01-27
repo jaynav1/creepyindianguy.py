@@ -6,6 +6,7 @@ import asyncio
 import time
 from itertools import cycle
 import youtube_dl
+import feedparser
 import json
 import os
 
@@ -165,6 +166,14 @@ async def echo(*args):
     for word in args:
         output += word
         output += ' '
+    await client.say(output)
+   
+#NEW pewdiepie video command
+@client.command()
+async def pewds():
+    Feed = feedparser.parse('https://www.youtube.com/feeds/videos.xml?channel_id=UC-lHJZR3Gqxm24_Vd_AJ5Yw')
+    entry = Feed.entries[1]
+    output = entry.link
     await client.say(output)
 
 #Clear command
